@@ -8,6 +8,10 @@ import './flightsurety.css';
 
     let result = null;
 
+    let insuraceFixedPayValue= 2; // ether
+
+    DOM.elid('insuracePayValue').value= insuraceFixedPayValue;
+
     let contract = new Contract('localhost', () => {
 
         // Read transaction
@@ -19,12 +23,42 @@ import './flightsurety.css';
 
         // User-submitted transaction
         DOM.elid('submit-oracle').addEventListener('click', () => {
+            let airline = DOM.elid('ddairline').value;
+            console.log(airline);
             let flight = DOM.elid('flight-number').value;
             // Write transaction
-            contract.fetchFlightStatus(flight, (error, result) => {
+            contract.fetchFlightStatus(airline, flight, (error, result) => {
                 display('Oracles', 'Trigger oracles', [ { label: 'Fetch Flight Status', error: error, value: result.flight + ' ' + result.timestamp} ]);
             });
+
         })
+
+        // User-submitted transaction
+        DOM.elid('buyInsurance').addEventListener('click', () => {
+            let airline = DOM.elid('ddairline').value;
+            console.log(airline);
+            let flight = DOM.elid('flight-number').value;
+            let passenger = DOM.elid('ddPassenger').value;
+            // Write transaction
+            contract.buy(passenger, insuraceFixedPayValue, airline, flight, (error, result) => {
+                display('Buy', 'Trigger Buy', [ { label: 'Passenger buy insurance', error: error, value: result.from + ' ' + result.value} ]);
+            });
+
+        })
+        
+        // User-submitted transaction
+        DOM.elid('withDraw').addEventListener('click', () => {
+            let passenger = DOM.elid('ddPassenger').value;
+            // Write transaction
+            contract.withdraw(passenger, (error, result) => {
+                if(!error && result){
+                    result = 'Had been Paid claim to passenger'
+                }
+                display('Withdarw', 'Trigger Withdarw', [ { label: 'Passenger withdraw', error: error, value: result} ]);
+            });
+
+        })
+        
     
     });
     

@@ -93,11 +93,7 @@ contract('Flight Surety Tests', async (accounts) => {
         // Declare and Initialize a variable for event
         var eventEmitted = false
 
-        // Watch the emitted event Sold()
-        config.flightSuretyApp.airlineFunded({}, function (error, result) {
-            eventEmitted = true;
-        });
-        let foundingAmount = web3.utils.toWei("10", "ether");
+        let foundingAmount = web3.utils.toWei("20", "ether");
 
         try {
             await config.flightSuretyApp.airlineFunding({ from: config.firstAirline, value: foundingAmount });
@@ -108,7 +104,6 @@ contract('Flight Surety Tests', async (accounts) => {
         let airlineInfo = await config.flightSuretyData.getAirlineInfo.call(config.firstAirline);
         // console.log(airlineInfo);
         // ASSERT
-        assert.equal(eventEmitted, true, 'Invalid event emitted');
         assert.equal(airlineInfo[2], true, 'Airline funds failure');
     });
 

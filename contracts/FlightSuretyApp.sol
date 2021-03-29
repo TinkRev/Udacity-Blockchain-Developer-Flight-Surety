@@ -13,7 +13,7 @@ contract FlightSuretyApp {
     using SafeMath for uint256; // Allow SafeMath functions to be called for all uint256 types (similar to "prototype" in Javascript)
 
     FlightSuretyData flightSuretyData;
-    uint fundingThreshold=10 ether;
+    uint private constant FUNDING_THRESHOLD = 10 ether;
     
     /********************************************************************************************/
     /*                                       DATA VARIABLES                                     */
@@ -56,13 +56,6 @@ contract FlightSuretyApp {
         _;
     }
 
-    // Define a modifier that checks the price and refunds the remaining balance
-    modifier checkFundingValue() {
-        _;
-        uint _price = fundingThreshold;
-        uint amountToReturn = msg.value - _price;
-        address(uint160(msg.sender)).transfer(amountToReturn);
-    }
     /********************************************************************************************/
     /*                                       CONSTRUCTOR                                        */
     /********************************************************************************************/
@@ -71,10 +64,12 @@ contract FlightSuretyApp {
      * @dev Contract constructor
      *
      */
-    constructor(address dataContract) public {
+    constructor(address dataContract) public payable {
         contractOwner = msg.sender;
+        // address payable payableDataContract= address(uint160(dataContract));
         flightSuretyData = FlightSuretyData(dataContract);
 
+        // address(this).transfer(msg.value);
     }
 
     /********************************************************************************************/
@@ -89,27 +84,48 @@ contract FlightSuretyApp {
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
 
-    event airlineWaitForApproving(address newAirline);
+    event AirlineWaitForApproving(address newAirline);
+    event AirlineRegistered(address newAirline);
     /**
      * @dev Add an airline to the registration queue
      *
      */
-    function registerAirline(string memory newAirlineName, address newAirline) public returns (bool success, uint256 votes)
+    function registerAirline(string memory newAirlineName, address newAirline) public returns (uint256 votes)
     {
-        (success, votes) = flightSuretyData.registerAirline(msg.sender, newAirlineName, newAirline);
-        if(votes * 2 < flightSuretyData.getAirlineRegisteredCounter()){
-            emit airlineWaitForApproving(newAirline);
+        uint minAirlineAounter = 4;
+        bool isRegistered = flightSuretyData.isAirlineRegistered(newAirline);
+        if(isRegistered){
+            bool isApproved = flightSuretyData.isAirlineApproved(newAirline);
+            require(!isApproved, "Airline has been registered and approved");
+            votes = flightSuretyData.vote(msg.sender, newAirline);
+            if(votes >= minAirlineAounter){
+                emit AirlineRegistered(newAirline);
+            }
+        }else{
+            bool _isApproved = flightSuretyData.addAirline(minAirlineAounter, msg.sender, newAirline);
+            if(_isApproved){
+                votes = 0;
+            }else{
+                emit AirlineWaitForApproving(newAirline);
+                votes = 1;
+            }
         }
 
-        return (success, votes);
+        return (votes);
     }
 
-    event airlineFunded();
-    function airlineFunding() external checkFundingValue() payable{
-        require(msg.value >= fundingThreshold,"Funded 10 ether to participate contract");
+    event AirlineFunded();
+    function airlineFunding() public payable{
+        require(msg.value >= FUNDING_THRESHOLD,"Funding 10 ether to participate contract");
 
-        flightSuretyData.airlineFunding.value(fundingThreshold)(msg.sender);
-        emit airlineFunded();
+        // https://docs.soliditylang.org/en/v0.5.16/control-structures.html?highlight=address%20function%20value#external-function-calls
+        // vm exception could not slove.
+        // flightSuretyData.fund.value(FUNDING_THRESHOLD)(msg.sender,FUNDING_THRESHOLD);
+        // address(uint160(address(flightSuretyData))).transfer(msg.value);
+        (bool success, bytes memory result) = address(uint160(address(flightSuretyData))).call.value(FUNDING_THRESHOLD)("");
+        require(success, "call data contract failure");
+        flightSuretyData.fund(msg.sender,msg.value);
+        emit AirlineFunded();
     }
 
     /**
@@ -117,19 +133,42 @@ contract FlightSuretyApp {
      *
      */
 
-    function registerFlight() external pure {}
+    function registerFlight(address airline, string calldata flight, uint256 timestamp) external {
+        flightSuretyData.addFlight(msg.sender, airline, flight, timestamp);
+    }
 
+    function buyInsurance(address airline, string calldata flight, uint256 timestamp) external payable{
+        (bool success, bytes memory result) = address(uint160(address(flightSuretyData))).call.value(msg.value)("");
+        require(success, "call data contract failure");
+        flightSuretyData.buy(msg.sender, msg.value, airline, flight, timestamp);
+    }
+
+
+    event CanWithdraw(address airline, string flight, uint8 statusCode);
     /**
      * @dev Called after oracle has updated flight status
      *
      */
-
     function processFlightStatus(
         address airline,
         string memory flight,
         uint256 timestamp,
         uint8 statusCode
-    ) internal pure {}
+    ) internal {
+        if(statusCode == STATUS_CODE_LATE_AIRLINE 
+            || statusCode == STATUS_CODE_LATE_TECHNICAL){
+                flightSuretyData.creditInsurees(airline, flight, timestamp);
+                emit CanWithdraw(airline, flight, statusCode);
+            }
+    }
+
+    event Paid(address passenger, uint balance);
+    function withdraw() external payable returns (address passenger, uint balance){
+        passenger = msg.sender;
+        balance = flightSuretyData.pay(passenger);
+        emit Paid(passenger, balance);
+        return (passenger, balance);
+    }
 
     // Generate a request for oracles to fetch flight information
     function fetchFlightStatus(
@@ -258,9 +297,7 @@ contract FlightSuretyApp {
         // Information isn't considered verified until at least MIN_RESPONSES
         // oracles respond with the *** same *** information
         emit OracleReport(airline, flight, timestamp, statusCode);
-        if (
-            oracleResponses[key].responses[statusCode].length >= MIN_RESPONSES
-        ) {
+        if (oracleResponses[key].responses[statusCode].length >= MIN_RESPONSES) {
             emit FlightStatusInfo(airline, flight, timestamp, statusCode);
 
             // Handle flight status as appropriate
@@ -315,12 +352,19 @@ contract FlightSuretyApp {
     }
 
     // endregion
+
 }
 
 contract FlightSuretyData {
-    function registerAirline(address airline, string calldata newAirlineName, address newAirline) external returns (bool success, uint256 votes);
+    function authorizeContract(address contractAddress) external;
+    function addAirline(uint minAirlineCounter,address airline, address newAirline) external returns (bool waitForVoting);
+    function vote(address airline, address newAirline) external returns(uint voteCounter);
     function isAirlineRegistered(address airline) external view returns (bool);
     function isAirlineApproved(address airline) external view returns (bool);
     function getAirlineRegisteredCounter() external view returns (uint256);
-    function airlineFunding(address airline) external payable;
+    function fund(address airline, uint amount) public payable;
+    function addFlight(address updator, address airline, string calldata flight, uint256 timestamp) external;
+    function buy(address passenger, uint amount, address airline, string calldata flight, uint256 timestamp) external payable;
+    function creditInsurees(address airline, string calldata flight, uint256 timestamp) external;
+    function pay(address passenger) external payable returns (uint balance);
 }

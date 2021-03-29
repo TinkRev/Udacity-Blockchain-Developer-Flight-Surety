@@ -1,7 +1,19 @@
 # FlightSurety
 
+test step:
+using a terminal run truffle: `truffle develop`
+using second terminal run dapp: `npm run dapp`
+using third terminal run oracle simulator server: `npm run server`
+using the truffle terminal to do the test: `test`
+
+"openzeppelin-solidity": "2.5.1",
+truffle: 5.0.1
+solidity: 5
 FlightSurety is a sample application project for Udacity's Blockchain course.
 
+1. check flight status such as take-off, lended, etc., by click "Submit to Oracled" button.
+> provided a flight list.
+2. 
 ## Install
 
 This repository contains Smart Contract code in Solidity (using Truffle), tests (also using Truffle), dApp scaffolding (using HTML, CSS and JS) and server app scaffolding.

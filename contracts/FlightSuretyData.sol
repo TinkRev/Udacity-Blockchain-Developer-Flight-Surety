@@ -13,29 +13,41 @@ contract FlightSuretyData {
     bool private operational = true; // Blocks all state changes throughout the contract if false
     mapping(address => uint256) private authorizedContracts;
     mapping(address => uint256) private fundedInfo;
-    uint256 private fundedBalance;
+    uint private fundedBalance = 0;
 
     struct Airline {
         bool isApproved; // passed multi consensus
         bool isRegistered;
-        uint256 updatedTimestamp;
+        address updator;
         bool isFunded; // can participate contact
-        string name;
         address airlineAddress;
     }
     uint256 private _airlineCounter;
     mapping(address => Airline) private airlines; // keep airlines
     
-    uint256 M = 0;
-    address[] multiCalls = new address[](0);
+    uint multiCallCounter = 0;
+    mapping(uint => address) private multiCalls;
+
+    struct Passenger{
+        address passengerAddress;
+        uint amount;
+    }
 
     struct Flight {
         bool isRegistered;
         uint8 statusCode;
-        uint256 updatedTimestamp;
+        address updator;
         address airline;
+        mapping(address => uint) passengerInsured;
+        uint passengerInsuredCounter;
+        mapping(uint => Passenger) passengerInsuredInfos;
     }
     mapping(bytes32 => Flight) private flights; // keep flights
+
+    mapping(address => Passenger) private payOutToPassenger;
+    mapping(uint => address) private payOutKeys;
+    uint private payOutCounter;
+
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
@@ -45,11 +57,10 @@ contract FlightSuretyData {
      * @dev Constructor
      *      The deploying account becomes contractOwner
      */
-    constructor(string memory firstAirlineName, address firstAirline) public {
+    constructor(string memory firstAirlineName, address firstAirline) public payable {
         contractOwner = msg.sender;
-
         _airlineCounter = 0;
-        _registerAirline(firstAirlineName, firstAirline, true);
+        _registerAirline(msg.sender, firstAirline, true);
     }
 
     /********************************************************************************************/
@@ -94,10 +105,6 @@ contract FlightSuretyData {
 
     modifier requireAirlineFunded(address airline) {
         require(airlines[airline].isFunded, "Airline should fund first");
-        _;
-    }
-    modifier requireAirlineNotFunded(address airline) {
-        require(!airlines[airline].isFunded, "Airline should fund only once");
         _;
     }
 
@@ -145,67 +152,73 @@ contract FlightSuretyData {
      *
      */
 
-    function registerAirline(address airline, string calldata newAirlineName, address newAirline) external
-        requireIsCallerAuthorized requireAirlineFunded(airline) returns (bool success, uint256 votes){
-        bool _isApproved;
-        if(airlines[newAirline].isRegistered){
-            if(airlines[newAirline].isApproved){
-                // do nothing now
-            }else{
-                // Multiparty Consensus >=50%
-                // do voting
-                // update M
-                M = _airlineCounter;
-
-                // do approve
-                bool isDuplicate = false;
-                for (uint256 c = 0; c < multiCalls.length; c++) {
-                    if (multiCalls[c] == airline) {
-                        isDuplicate = true;
-                        break;
-                    }
-                }
-                require(!isDuplicate, "Caller has already called this function.");
-                multiCalls.push(airline);
-            
-                if (multiCalls.length * 2 >= M) {
-                    _isApproved = true;
-                    multiCalls = new address[](0);
-                    _updateAirlineApproveInfo(newAirline, _isApproved);
-                }else{
-                    _isApproved = false;
-                }
-            }
+    function addAirline(uint minAirlineCounter,address airline, address newAirline) external
+        requireIsCallerAuthorized requireAirlineFunded(airline) returns (bool waitForVoting){
+        // do register
+        bool _isApproved=false;
+        if(_airlineCounter < minAirlineCounter){
+            _isApproved = true;
         }else{
-            // do register
-            if(_airlineCounter<4){
-                _isApproved = true;
-            }else{
-                _isApproved = false;
-                multiCalls.push(airline);
-            }
-                _registerAirline(newAirlineName, newAirline, _isApproved);
+            _isApproved = false;
+            multiCalls[multiCallCounter] = airline;
+            multiCallCounter = multiCallCounter.add(1);
         }
+        _registerAirline(airline, newAirline, _isApproved);
 
-        return (true, multiCalls.length);
+        waitForVoting = _isApproved;
+        return waitForVoting;
     }
 
-    function _registerAirline(string memory newAirlineName, address newAirline, bool isApproved) internal
+    function vote(address airline, address newAirline) external returns(uint voteCounter){
+        require(!airlines[newAirline].isApproved, "Airline had been approved");
+
+        bool _isApproved=false;
+        // Multiparty Consensus >=50%
+        // do voting
+        // update M
+        uint M = _airlineCounter;
+
+        // do approve
+        bool isDuplicate = false;
+        for (uint256 c = 0; c < multiCallCounter; c++) {
+            if (multiCalls[c] == airline) {
+                isDuplicate = true;
+                break;
+            }
+        }
+
+        require(!isDuplicate, "Caller has already called this function.");
+
+        multiCalls[multiCallCounter] = airline;
+        multiCallCounter = multiCallCounter.add(1);
+    
+        if (multiCallCounter * 2 >= M) {
+            _isApproved = true;
+            multiCallCounter = 0;
+            _updateAirlineApproveInfo(airline, newAirline, _isApproved);
+        }else{
+            _isApproved = false;
+        }
+
+        voteCounter = multiCallCounter;
+        return voteCounter;
+    }
+
+    function _registerAirline(address updator, address newAirline, bool isApproved) private
         requireAirlineNotRegistered(newAirline) {
         airlines[newAirline] = Airline({
             isApproved: isApproved,
             isRegistered: true,
-            updatedTimestamp: now,
+            updator: updator,
             isFunded: false,
-            name: newAirlineName,
             airlineAddress: newAirline
         });
-        _airlineCounter++;
+        _airlineCounter = _airlineCounter.add(1);
     }
 
-    function _updateAirlineApproveInfo(address airline, bool isApproved) internal requireAirlineRegistered(airline){
+    function _updateAirlineApproveInfo(address updator, address airline, bool isApproved) internal requireAirlineRegistered(airline){
         airlines[airline].isApproved = isApproved;
-        airlines[airline].updatedTimestamp = now;
+        airlines[airline].updator = updator;
     }
 
     function getAirlineRegisteredCounter() external requireIsCallerAuthorized view returns (uint256)
@@ -213,27 +226,16 @@ contract FlightSuretyData {
         return _airlineCounter;
     }
 
-    function airlineFunding(address airline)
-        external
-        payable
-        requireAirlineRegistered(airline)
-        requireAirlineNotFunded(airline)
-    {
-        airlines[airline].updatedTimestamp = now;
-        airlines[airline].isFunded = true;
-        fundedInfo[airline] = fundedInfo[airline].add(msg.value);
-        fundedBalance = fundedBalance.add(msg.value);
-    }
 
     function isAirlineRegistered(address airline) external requireIsCallerAuthorized view returns (bool) {
         return airlines[airline].isRegistered;
     }
 
-    function isAirlineApproved(address airline) external requireIsCallerAuthorized requireAirlineRegistered(airline) view returns (bool) {
+    function isAirlineApproved(address airline) external requireIsCallerAuthorized view returns (bool) {
         return airlines[airline].isApproved;
     }
 
-    function isAirlineFunded(address airline) external requireIsCallerAuthorized requireAirlineRegistered(airline) view returns (bool) {
+    function isAirlineFunded(address airline) external requireIsCallerAuthorized view returns (bool) {
         return airlines[airline].isFunded;
     }
 
@@ -242,25 +244,37 @@ contract FlightSuretyData {
         view
         returns (
             bool isRegistered,
-            uint256 updatedTimestamp,
+            address updator,
             bool isFunded,
-            string memory airlineName,
             address airlineAddress
         )
     {
         Airline memory element = airlines[airline];
         isRegistered = element.isRegistered;
-        updatedTimestamp = element.updatedTimestamp;
+        updator = element.updator;
         isFunded = element.isFunded;
-        airlineName = element.name;
         airlineAddress = element.airlineAddress;
         return (
             isRegistered,
-            updatedTimestamp,
+            updator,
             isFunded,
-            airlineName,
             airlineAddress
         );
+    }
+
+
+
+    function addFlight(address updator, address airline, string calldata flight, uint256 timestamp) external 
+    requireIsCallerAuthorized(){
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        flights[flightKey] = Flight({
+            isRegistered:true,
+            statusCode: 0,
+            updator: updator,
+            airline: airline,
+            passengerInsuredCounter: 0
+        });
+
     }
 
     /**
@@ -268,18 +282,54 @@ contract FlightSuretyData {
      *
      */
 
-    function buy() external payable {}
+    function buy(address passenger, uint amount, address airline, string calldata flight, uint256 timestamp) external payable {
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        uint counter = flights[flightKey].passengerInsuredCounter;
+        
+        flights[flightKey].passengerInsuredInfos[counter] = Passenger({
+            passengerAddress: passenger,
+            amount: amount
+        });
+        flights[flightKey].passengerInsuredCounter = counter.add(1);
+        flights[flightKey].passengerInsured[passenger] = 1;
+
+    }
 
     /**
      *  @dev Credits payouts to insurees
      */
-    function creditInsurees() external pure {}
+    function creditInsurees(address airline, string calldata flight, uint256 timestamp) external {
+        bytes32 flightKey = getFlightKey(airline, flight, timestamp);
+        uint counter = flights[flightKey].passengerInsuredCounter;
+        for(uint index=0; index< counter; index++){
+            address passenger = flights[flightKey].passengerInsuredInfos[index].passengerAddress;
+            uint amount = flights[flightKey].passengerInsuredInfos[index].amount;
+            flights[flightKey].passengerInsured[passenger] = 0;
+            flights[flightKey].passengerInsuredInfos[index].amount = 0;
+            flights[flightKey].passengerInsuredCounter = flights[flightKey].passengerInsuredCounter.sub(1);
+            payOutToPassenger[passenger].amount = payOutToPassenger[passenger].amount.add(amount.mul(3).div(2));
+            payOutKeys[payOutCounter] = passenger;
+            payOutCounter = payOutCounter.add(1);
+        }
+
+    }
+
+    // function getPayOutInfos() external view returns(mapping(uint => address), uint){
+    //     return (payOutToPassenger, payOutCounter);
+    // }
 
     /**
      *  @dev Transfers eligible payout funds to insuree
      *
      */
-    function pay() external pure {}
+    function pay(address passenger) external payable returns (uint balance){
+        require(payOutToPassenger[passenger].amount>0, "nothing need to pay");
+        balance = payOutToPassenger[passenger].amount;
+        delete payOutToPassenger[passenger];
+        address(uint160(passenger)).transfer(balance);
+
+        return balance;
+    }
 
     /**
      * @dev Initial funding for the insurance. Unless there are too many delayed flights
@@ -287,7 +337,16 @@ contract FlightSuretyData {
      *
      */
 
-    function fund() public payable {}
+    function fund(address airline, uint amount) public payable 
+        requireAirlineRegistered(airline)
+    {
+        // can fund more than once
+        airlines[airline].updator = airline;
+        airlines[airline].isFunded = true;
+        fundedInfo[airline] = fundedInfo[airline].add(amount);
+        fundedBalance = fundedBalance.add(msg.value);
+        
+    }
 
     function getFlightKey(
         address airline,
@@ -302,6 +361,6 @@ contract FlightSuretyData {
      *
      */
     function() external payable {
-        fund();
+        // fundedBalance = fundedBalance.add(msg.value);
     }
 }

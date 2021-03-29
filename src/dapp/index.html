@@ -24,7 +24,22 @@
         <div id="display-wrapper" class="top-20">
         </div>
         <div class="row top-20">
-            <label class="form">Flight</label> <input type="text" id="flight-number"> <btn class="btn btn-primary" id="submit-oracle">Submit to Oracles</btn>
+            <label class="form">Airline</label> <select id="ddairline" name="ddairline"></select>
+        </div>
+        <div class="row top-20">
+            <label class="form">Flight</label><select id="flight-number" name="flight-number"></select> 
+        </div>
+        <div class="row top-20">
+            <label class="form">Passenger</label> <select id="ddPassenger" name="ddPassenger"></select>
+        </div>
+        <div class="row top-20">
+            <label class="form">Insurance amount</label><input type="number" id="insuracePayValue" value="1" disabled/>
+            <button class="btn btn-primary" id="buyInsurance">Buy Insurance</button>
+            <div class="col">
+            <button class="btn btn-primary" id="withDraw">Withdraw Payout</button></div>
+        </div>
+        <div class="row top-20">
+            <btn class="btn btn-primary" id="submit-oracle">Submit to fetch Oracles to get flight status</btn>
         </div>
     </main>
 
