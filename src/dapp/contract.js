@@ -7,7 +7,8 @@ export default class Contract {
     constructor(network, callback) {
 
         let config = Config[network];
-        this.web3 = new Web3(new Web3.providers.HttpProvider(config.url));
+        // this.web3 = new Web3(new Web3.providers.HttpProvider(config.url));
+        this. web3 = new Web3(new Web3.providers.WebsocketProvider(config.url.replace('http', 'ws')));
         this.flightSuretyData = new this.web3.eth.Contract(FlightSuretyData.abi, config.dataAddress);
         this.flightSuretyApp = new this.web3.eth.Contract(FlightSuretyApp.abi, config.appAddress);
         this.initialize(config.appAddress, callback);
@@ -81,15 +82,6 @@ export default class Contract {
             }
             document.getElementById("ddPassenger").innerHTML = options;
 
-            this.flightSuretyApp.events.FlightStatusInfo({fromBlock: 0})
-            .on('data', async function(event){
-                console.log('data'); // same results as the optional callback above
-            });
-
-            this.flightSuretyApp.events.Paid({fromBlock: 0})
-            .on('data', async function(event){
-                console.log('data'); // same results as the optional callback above
-            });
             
             callback();
         });
@@ -100,7 +92,7 @@ export default class Contract {
         // console.log("register: "+airline);
         return new Promise((resolve, result) =>{
             this.flightSuretyApp.methods.registerAirline(newAirline, newAirline)
-            .send({ "from": airline}, (error, result) => {
+            .send({ "from": airline, "gas": 9999999}, (error, result) => {
                 // callback(error, payload);
                 if(error) console.log(error);
                 else 
@@ -183,7 +175,7 @@ export default class Contract {
             });
     }
 
-    fetchFlightStatus(airline, flight, callback) {
+    async fetchFlightStatus(airline, flight, callback) {
         let flightTimestamp = Math.floor(this.flightNumbers.get(flight).getTime()/ 1000);
         let self = this;
         let payload = {
@@ -192,7 +184,7 @@ export default class Contract {
             timestamp: flightTimestamp
         } 
         
-        self.flightSuretyApp.methods
+        await self.flightSuretyApp.methods
             .fetchFlightStatus(payload.airline, payload.flight, payload.timestamp)
             .send({ from: self.owner}, (error, result) => {
                 

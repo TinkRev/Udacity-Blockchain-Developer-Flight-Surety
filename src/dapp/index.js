@@ -51,9 +51,6 @@ import './flightsurety.css';
             let passenger = DOM.elid('ddPassenger').value;
             // Write transaction
             contract.withdraw(passenger, (error, result) => {
-                if(!error && result){
-                    result = 'Had been Paid claim to passenger'
-                }
                 display('Withdarw', 'Trigger Withdarw', [ { label: 'Passenger withdraw', error: error, value: result} ]);
             });
 
@@ -62,6 +59,24 @@ import './flightsurety.css';
     
     });
     
+    
+    contract.flightSuretyApp.events.CanWithdraw()
+    .on('data', async function(event){
+        let val = "Airline: "+ event.returnValues.airline+ ", Flight: "+ event.returnValues.flight+ ", Reason: "+ (event.returnValues.statusCode == '20'? "Late": "Technical")
+        display('Passenger Repayment', 'Airline fault', [ { label: 'Process Flight Status', error: '', value: val} ]);
+
+        console.log(event.returnValues);
+        // Do something here
+    })
+    .on('error', console.error);
+
+    contract.flightSuretyApp.events.Paid()
+    .on('data', async function(event){
+        let val = "Passenger: "+ event.returnValues.passenger+ ", Received amount: "+ event.returnValues.balance
+        display('Passenger Withdraw', 'Passenger received amount of claim', [ { label: 'Withdraw', error: '', value: val} ]);
+
+        console.log(event.returnValues);
+    });
 
 })();
 
@@ -77,7 +92,7 @@ function display(title, description, results) {
         row.appendChild(DOM.div({className: 'col-sm-8 field-value'}, result.error ? String(result.error) : String(result.value)));
         section.appendChild(row);
     })
-    displayDiv.append(section);
+    displayDiv.prepend(section);
 
 }
 
