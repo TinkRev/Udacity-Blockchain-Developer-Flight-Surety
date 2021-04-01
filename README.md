@@ -2,9 +2,15 @@
 
 FlightSurety is a sample application project for Udacity's Blockchain course.
 
-1. check flight status such as take-off, lended, etc., by click "Submit to Oracled" button.
-> provided a flight list.
-2. 
+1. 1~20 address used as owner(1) airlines(2-5) and oracles(1-20).
+> Assumed owner and airlines also has oracles so the same address used for them.
+> First airline was register when Contract deployment and it funded when DAPP initialized in contract.js.
+> First airline then registered its flights and other airlines(3-5) after funded in DAPP initialized step, other airline did fund after registered.
+> Oracles was registered when oracle server initialized.
+
+2. Using dapp
+> Select airline, flight and passenger address to simulate passenger buy insurance with constant fee.
+> After buy insurance, click `Submit to fetch Oracles to get flight status` repeatly until show `processFlightStatus` event be emit, then can do `Withdraw`. 
 
 ## Prerequisites
 
