@@ -57,7 +57,7 @@ contract FlightSuretyData {
      * @dev Constructor
      *      The deploying account becomes contractOwner
      */
-    constructor(string memory firstAirlineName, address firstAirline) public payable {
+    constructor(address firstAirline) public payable {
         contractOwner = msg.sender;
         _airlineCounter = 0;
         _registerAirline(msg.sender, firstAirline, true);
@@ -153,7 +153,7 @@ contract FlightSuretyData {
      */
 
     function addAirline(uint minAirlineCounter,address airline, address newAirline) external
-        requireIsCallerAuthorized requireAirlineFunded(airline) returns (bool waitForVoting){
+        requireIsOperational requireIsCallerAuthorized requireAirlineFunded(airline) returns (bool waitForVoting){
         // do register
         bool _isApproved=false;
         if(_airlineCounter < minAirlineCounter){
@@ -169,7 +169,9 @@ contract FlightSuretyData {
         return waitForVoting;
     }
 
-    function vote(address airline, address newAirline) external returns(uint voteCounter){
+    function vote(address airline, address newAirline) external 
+        requireIsOperational returns(uint voteCounter)
+    {
         require(!airlines[newAirline].isApproved, "Airline had been approved");
 
         bool _isApproved=false;
@@ -205,7 +207,8 @@ contract FlightSuretyData {
     }
 
     function _registerAirline(address updator, address newAirline, bool isApproved) private
-        requireAirlineNotRegistered(newAirline) {
+        requireAirlineNotRegistered(newAirline) 
+    {
         airlines[newAirline] = Airline({
             isApproved: isApproved,
             isRegistered: true,
@@ -216,32 +219,44 @@ contract FlightSuretyData {
         _airlineCounter = _airlineCounter.add(1);
     }
 
-    function _updateAirlineApproveInfo(address updator, address airline, bool isApproved) internal requireAirlineRegistered(airline){
+    function _updateAirlineApproveInfo(address updator, address airline, bool isApproved) internal 
+        requireAirlineRegistered(airline)
+    {
         airlines[airline].isApproved = isApproved;
         airlines[airline].updator = updator;
     }
 
-    function getAirlineRegisteredCounter() external requireIsCallerAuthorized view returns (uint256)
+    function getAirlineRegisteredCounter() external view
+        requireIsOperational requireIsCallerAuthorized 
+        returns (uint256)
     {
         return _airlineCounter;
     }
 
 
-    function isAirlineRegistered(address airline) external requireIsCallerAuthorized view returns (bool) {
+    function isAirlineRegistered(address airline) external view 
+        requireIsOperational requireIsCallerAuthorized 
+        returns (bool) 
+    {
         return airlines[airline].isRegistered;
     }
 
-    function isAirlineApproved(address airline) external requireIsCallerAuthorized view returns (bool) {
+    function isAirlineApproved(address airline) external view
+        requireIsOperational requireIsCallerAuthorized 
+        returns (bool) 
+    {
         return airlines[airline].isApproved;
     }
 
-    function isAirlineFunded(address airline) external requireIsCallerAuthorized view returns (bool) {
+    function isAirlineFunded(address airline) external
+        requireIsOperational requireIsCallerAuthorized view 
+        returns (bool) 
+    {
         return airlines[airline].isFunded;
     }
 
     function getAirlineInfo(address airline)
-        external requireIsCallerAuthorized
-        view
+        external view requireIsOperational requireIsCallerAuthorized
         returns (
             bool isRegistered,
             address updator,
@@ -265,7 +280,8 @@ contract FlightSuretyData {
 
 
     function addFlight(address updator, address airline, string calldata flight, uint256 timestamp) external 
-    requireIsCallerAuthorized(){
+        requireIsOperational requireIsCallerAuthorized()
+    {
         bytes32 flightKey = getFlightKey(airline, flight, timestamp);
         flights[flightKey] = Flight({
             isRegistered:true,
@@ -282,7 +298,9 @@ contract FlightSuretyData {
      *
      */
 
-    function buy(address passenger, uint amount, address airline, string calldata flight, uint256 timestamp) external payable {
+    function buy(address passenger, uint amount, address airline, string calldata flight, uint256 timestamp) external payable 
+        requireIsOperational
+    {
         bytes32 flightKey = getFlightKey(airline, flight, timestamp);
         uint counter = flights[flightKey].passengerInsuredCounter;
         
@@ -298,7 +316,9 @@ contract FlightSuretyData {
     /**
      *  @dev Credits payouts to insurees
      */
-    function creditInsurees(address airline, string calldata flight, uint256 timestamp) external {
+    function creditInsurees(address airline, string calldata flight, uint256 timestamp) external 
+        requireIsOperational
+    {
         bytes32 flightKey = getFlightKey(airline, flight, timestamp);
         uint counter = flights[flightKey].passengerInsuredCounter;
         for(uint index=0; index< counter; index++){
@@ -322,7 +342,7 @@ contract FlightSuretyData {
      *  @dev Transfers eligible payout funds to insuree
      *
      */
-    function pay(address passenger) external payable returns (uint balance){
+    function pay(address passenger) external payable requireIsOperational returns (uint balance){
         require(payOutToPassenger[passenger].amount>0, "nothing need to pay");
         balance = payOutToPassenger[passenger].amount;
         delete payOutToPassenger[passenger];
@@ -337,8 +357,8 @@ contract FlightSuretyData {
      *
      */
 
-    function fund(address airline, uint amount) public payable 
-        requireAirlineRegistered(airline)
+    function fund(address airline, uint amount) public payable
+        requireIsOperational requireAirlineRegistered(airline)
     {
         // can fund more than once
         airlines[airline].updator = airline;

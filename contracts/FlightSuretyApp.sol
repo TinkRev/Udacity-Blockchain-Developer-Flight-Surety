@@ -44,7 +44,7 @@ contract FlightSuretyApp {
      */
     modifier requireIsOperational() {
         // Modify to call data contract's status
-        require(true, "Contract is currently not operational");
+        require(flightSuretyData.isOperational(), "Contract is currently not operational");
         _; // All modifiers require an "_" which indicates where the function body will be added
     }
 
@@ -76,8 +76,8 @@ contract FlightSuretyApp {
     /*                                       UTILITY FUNCTIONS                                  */
     /********************************************************************************************/
 
-    function isOperational() public pure returns (bool) {
-        return true; // Modify to call data contract's status
+    function isOperational() public view returns (bool) {
+        return flightSuretyData.isOperational(); // Modify to call data contract's status
     }
 
     /********************************************************************************************/
@@ -90,7 +90,7 @@ contract FlightSuretyApp {
      * @dev Add an airline to the registration queue
      *
      */
-    function registerAirline(string memory newAirlineName, address newAirline) public returns (uint256 votes)
+    function registerAirline(string memory newAirlineName, address newAirline) public requireIsOperational returns (uint256 votes)
     {
         uint minAirlineAounter = 4;
         bool isRegistered = flightSuretyData.isAirlineRegistered(newAirline);
@@ -115,7 +115,7 @@ contract FlightSuretyApp {
     }
 
     event AirlineFunded();
-    function airlineFunding() public payable{
+    function airlineFunding() public requireIsOperational payable{
         require(msg.value >= FUNDING_THRESHOLD,"Funding 10 ether to participate contract");
 
         // https://docs.soliditylang.org/en/v0.5.16/control-structures.html?highlight=address%20function%20value#external-function-calls
@@ -133,11 +133,11 @@ contract FlightSuretyApp {
      *
      */
 
-    function registerFlight(address airline, string calldata flight, uint256 timestamp) external {
+    function registerFlight(address airline, string calldata flight, uint256 timestamp) external requireIsOperational{
         flightSuretyData.addFlight(msg.sender, airline, flight, timestamp);
     }
 
-    function buyInsurance(address airline, string calldata flight, uint256 timestamp) external payable{
+    function buyInsurance(address airline, string calldata flight, uint256 timestamp) external requireIsOperational payable{
         (bool success, bytes memory result) = address(uint160(address(flightSuretyData))).call.value(msg.value)("");
         require(success, "call data contract failure");
         flightSuretyData.buy(msg.sender, msg.value, airline, flight, timestamp);
@@ -163,7 +163,7 @@ contract FlightSuretyApp {
     }
 
     event Paid(address passenger, uint balance);
-    function withdraw() external payable returns (address passenger, uint balance){
+    function withdraw() external requireIsOperational payable returns (address passenger, uint balance){
         passenger = msg.sender;
         balance = flightSuretyData.pay(passenger);
         emit Paid(passenger, balance);
@@ -175,7 +175,7 @@ contract FlightSuretyApp {
         address airline,
         string calldata flight,
         uint256 timestamp
-    ) external {
+    ) external requireIsOperational {
         uint8 index = getRandomIndex(msg.sender);
 
         // Generate a unique key for storing the request
@@ -248,7 +248,7 @@ contract FlightSuretyApp {
     );
 
     // Register an oracle with the contract
-    function registerOracle() external payable {
+    function registerOracle() external requireIsOperational payable {
         // Require registration fee
         require(msg.value >= REGISTRATION_FEE, "Registration fee is required");
 
@@ -257,7 +257,7 @@ contract FlightSuretyApp {
         oracles[msg.sender] = Oracle({isRegistered: true, indexes: indexes});
     }
 
-    function getMyIndexes() external view returns (uint8[3] memory) {
+    function getMyIndexes() external requireIsOperational view returns (uint8[3] memory) {
         require(
             oracles[msg.sender].isRegistered,
             "Not registered as an oracle"
@@ -276,7 +276,7 @@ contract FlightSuretyApp {
         string calldata flight,
         uint256 timestamp,
         uint8 statusCode
-    ) external {
+    ) external requireIsOperational {
         require(
             (oracles[msg.sender].indexes[0] == index) ||
                 (oracles[msg.sender].indexes[1] == index) ||
@@ -305,13 +305,13 @@ contract FlightSuretyApp {
         }
     }
 
-    function getFlightKey(
-        address airline,
-        string memory flight,
-        uint256 timestamp
-    ) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(airline, flight, timestamp));
-    }
+    // function getFlightKey(
+    //     address airline,
+    //     string memory flight,
+    //     uint256 timestamp
+    // ) internal pure returns (bytes32) {
+    //     return keccak256(abi.encodePacked(airline, flight, timestamp));
+    // }
 
     // Returns array of three non-duplicating integers from 0-9
     function generateIndexes(address account) internal returns (uint8[3] memory) {
@@ -356,6 +356,7 @@ contract FlightSuretyApp {
 }
 
 contract FlightSuretyData {
+    function isOperational() public view returns (bool);
     function authorizeContract(address contractAddress) external;
     function addAirline(uint minAirlineCounter,address airline, address newAirline) external returns (bool waitForVoting);
     function vote(address airline, address newAirline) external returns(uint voteCounter);

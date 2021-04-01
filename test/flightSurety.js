@@ -74,10 +74,9 @@ contract('Flight Surety Tests', async (accounts) => {
 
         // ARRANGE
         let newAirline = accounts[2];
-        let newAirlineName = "accounts[2]";
         // ACT
         try {
-            await config.flightSuretyApp.registerAirline(newAirlineName, newAirline, { from: config.firstAirline });
+            await config.flightSuretyApp.registerAirline(newAirline, { from: config.firstAirline });
         }
         catch (e) {
 
@@ -110,10 +109,9 @@ contract('Flight Surety Tests', async (accounts) => {
     it('(airline) can register an Airline using registerAirline() after funded', async () => {
         // ARRANGE
         let newAirline = accounts[2];
-        let newAirlineName = "accounts[2]";
         // ACT
         try {
-            let registerResult = await config.flightSuretyApp.registerAirline(newAirlineName, newAirline, { from: config.firstAirline });
+            let registerResult = await config.flightSuretyApp.registerAirline(newAirline, { from: config.firstAirline });
             // console.log(registerResult);
         }
         catch (e) {
@@ -130,19 +128,16 @@ contract('Flight Surety Tests', async (accounts) => {
         // ARRANGE
         let foundingAmount = web3.utils.toWei("10", "ether");
         let airline3 = accounts[3];
-        let airlineName3 = "accounts[3]";
         let airline4 = accounts[4];
-        let airlineName4 = "accounts[4]";
         let airline5 = accounts[5];
-        let airlineName5 = "accounts[5]";
 
         // ACT
         try {
-            let registerResult = await config.flightSuretyApp.registerAirline(airlineName3, airline3, { from: config.firstAirline });
+            let registerResult = await config.flightSuretyApp.registerAirline(airline3, { from: config.firstAirline });
             // console.log(registerResult);
-            registerResult = await config.flightSuretyApp.registerAirline(airlineName4, airline4, { from: config.firstAirline });
+            registerResult = await config.flightSuretyApp.registerAirline(airline4, { from: config.firstAirline });
             // console.log(registerResult);
-            registerResult = await config.flightSuretyApp.registerAirline(airlineName5, airline5, { from: config.firstAirline });
+            registerResult = await config.flightSuretyApp.registerAirline(airline5, { from: config.firstAirline });
             // console.log(registerResult);
 
         }
@@ -158,9 +153,9 @@ contract('Flight Surety Tests', async (accounts) => {
             await config.flightSuretyApp.airlineFunding({ from: airline3, value: foundingAmount });
             await config.flightSuretyApp.airlineFunding({ from: airline4, value: foundingAmount });
             // approving
-            let registerResult = await config.flightSuretyApp.registerAirline(airlineName5, airline5, { from: airline3 });
+            let registerResult = await config.flightSuretyApp.registerAirline(airline5, { from: airline3 });
             // console.log(registerResult);
-            registerResult = await config.flightSuretyApp.registerAirline(airlineName5, airline5, { from: airline4 });
+            registerResult = await config.flightSuretyApp.registerAirline(airline5, { from: airline4 });
             // console.log(registerResult);
 
         }

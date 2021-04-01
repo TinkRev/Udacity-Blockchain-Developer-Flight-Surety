@@ -7,8 +7,7 @@ module.exports = function(deployer) {
 
     let firstAirline = '0xd10c00c953b3d4de6f2ad234c7460a65de1d2b24'; // from truffle console account[1]
     // firstAirline = '0x40e056B52D68b13ce04a571a287DC68332e12399'; // from ganache , {value: 20000000000000000000}
-    let firstAirlineName = "UDACITY";
-    deployer.deploy(FlightSuretyData, firstAirlineName, firstAirline, {value: 20000000000000000000})
+    deployer.deploy(FlightSuretyData, firstAirline, {value: 20000000000000000000})
     .then(() => {
         return deployer.deploy(FlightSuretyApp, FlightSuretyData.address, {value: 20000000000000000000})
                 .then(() => {
