@@ -90,7 +90,7 @@ contract FlightSuretyApp {
      * @dev Add an airline to the registration queue
      *
      */
-    function registerAirline(string memory newAirlineName, address newAirline) public requireIsOperational returns (uint256 votes)
+    function registerAirline(address newAirline) public requireIsOperational returns (uint256 votes)
     {
         uint minAirlineAounter = 4;
         bool isRegistered = flightSuretyData.isAirlineRegistered(newAirline);
